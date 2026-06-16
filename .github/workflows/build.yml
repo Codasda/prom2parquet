@@ -4,9 +4,6 @@ name: OneTime Build For Codasda
 on:
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,23 +11,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Golang (No Cache Mode)
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-          cache: false
-
-      - name: Compile and Package Artifacts
+      - name: Build via Project Dockerfile
         run: |
-          # 1. 创建干净的独立输出目录
+          # 1. 创建干净的输出目录
           mkdir -p build_outputs
           
-          # 2. 编译 Linux AMD64 纯二进制文件（修正：直接编译当前目录，不再指定错误的 main.go）
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build_outputs/prom2parquet .
-          
-          # 3. 编译并打包 Linux AMD64 Docker 镜像
+          # 2. 直接利用原项目自带的 Dockerfile 进行容器编译（它自己会处理好所有依赖）
           docker build -t prom2parquet:latest .
+          
+          # 3. 将编译好的镜像打包成压缩包
           docker save prom2parquet:latest | gzip > build_outputs/prom2parquet_image.tar.gz
+
+          # 4. 临时启动容器，直接把里面编译好的 linux 纯二进制文件“偷”出来
+          docker create --name temp_container prom2parquet:latest
+          docker cp temp_container:/app/prom2parquet build_outputs/prom2parquet
+          docker rm temp_container
 
       - name: Upload Clean Outputs
         uses: actions/upload-artifact@v4
