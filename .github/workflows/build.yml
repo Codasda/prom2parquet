@@ -14,20 +14,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Install Golang (No Cache Mode)
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
+          cache: false
 
       - name: Compile and Package Artifacts
         run: |
-          # 1. Create a dedicated output directory
+          # 1. 创建干净的独立输出目录
           mkdir -p build_outputs
           
-          # 2. Build Linux AMD64 Binary
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build_outputs/prom2parquet main.go
+          # 2. 编译 Linux AMD64 纯二进制文件（修正：直接编译当前目录，不再指定错误的 main.go）
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build_outputs/prom2parquet .
           
-          # 3. Build Docker Image and export as tar.gz
+          # 3. 编译并打包 Linux AMD64 Docker 镜像
           docker build -t prom2parquet:latest .
           docker save prom2parquet:latest | gzip > build_outputs/prom2parquet_image.tar.gz
 
