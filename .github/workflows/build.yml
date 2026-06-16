@@ -13,42 +13,31 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: 'recursive' # 👈 极其重要：原厂提到了依赖子模块，这里必须自动强制拉取
 
-      - name: Install Pure Go
+      - name: Install Official Go Environment
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
           cache: false
 
-      - name: Force Clean Build And Package
+      - name: Execute Author's Official Build Pipeline
         run: |
-          # 1. 创建干净的输出目录
+          # 1. 建立最终用于下载的干净目录
           mkdir -p build_outputs
           
-          # 2. 强制拉取并修复当前项目的所有底层模块依赖
-          go mod tidy
+          # 2. 百分之百运行作者写的 Makefile，在本地生成标准的 .build/ 编译缓存
+          make build
           
-          # 3. 绕过原厂繁琐的 images/build.sh 路径依赖，直接在根目录静态编译出纯正的 Linux AMD64 二进制文件
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build_outputs/prom2parquet .
+          # 3. 此时隐藏目录 .build 已经就绪，完美契合作者的 images/Dockerfile 路径
+          docker build -f images/Dockerfile -t prom2parquet:latest .
           
-          # 4. 【终极绝招】我们现场直接给它手写一个最纯净、绝不可能报“找不到路径”的单层 Dockerfile
-          cat << 'EOF' > Dockerfile_final
-          FROM alpine:3.19
-          WORKDIR /app
-          COPY build_outputs/prom2parquet .
-          EXPOSE 1234
-          ENTRYPOINT ["./prom2parquet"]
-          EOF
-          
-          # 5. 指定使用刚刚手写的完备文件，构建出完全一致的本地 Docker 镜像
-          docker build -f Dockerfile_final -t prom2parquet:latest .
-          
-          # 6. 将镜像导出为压缩包存入输出目录
+          # 4. 把官方镜像导出为压缩包
           docker save prom2parquet:latest | gzip > build_outputs/prom2parquet_image.tar.gz
+          
+          # 5. 同时把 Makefile 刚才在 .build/ 目录下原生编译出来的 Linux 二进制也提取出来放好
+          cp .build/prom2parquet build_outputs/prom2parquet
 
-      - name: Upload Clean Outputs
+      - name: Upload Author Approved Outputs
         uses: actions/upload-artifact@v4
         with:
           name: prom2parquet-outputs
