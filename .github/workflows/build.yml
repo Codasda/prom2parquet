@@ -4,6 +4,9 @@ name: OneTime Build For Codasda
 on:
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,18 +14,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build via Project Dockerfile
+      - name: Build Using Real Deploy Dockerfile
         run: |
           # 1. 创建干净的输出目录
           mkdir -p build_outputs
           
-          # 2. 直接利用原项目自带的 Dockerfile 进行容器编译（它自己会处理好所有依赖）
-          docker build -t prom2parquet:latest .
+          # 2. 【核心修复】使用真实的绝对路径 deploy/Dockerfile 进行编译
+          docker build -f deploy/Dockerfile -t prom2parquet:latest .
           
-          # 3. 将编译好的镜像打包成压缩包
+          # 3. 将原厂编译出来的完整镜像打包成 tar.gz 压缩包
           docker save prom2parquet:latest | gzip > build_outputs/prom2parquet_image.tar.gz
 
-          # 4. 临时启动容器，直接把里面编译好的 linux 纯二进制文件“偷”出来
+          # 4. 从原厂镜像中把纯 Linux AMD64 二进制程序拷贝出来
           docker create --name temp_container prom2parquet:latest
           docker cp temp_container:/app/prom2parquet build_outputs/prom2parquet
           docker rm temp_container
