@@ -4,6 +4,9 @@ name: OneTime Build For Codasda
 on:
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,21 +19,21 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build Binary
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      - name: Compile and Package Artifacts
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o prom2parquet main.go
-
-      - name: Build Docker Image Tar
-        run: |
+          # 1. Create a dedicated output directory
+          mkdir -p build_outputs
+          
+          # 2. Build Linux AMD64 Binary
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o build_outputs/prom2parquet main.go
+          
+          # 3. Build Docker Image and export as tar.gz
           docker build -t prom2parquet:latest .
-          docker save prom2parquet:latest | gzip > prom2parquet_image.tar.gz
+          docker save prom2parquet:latest | gzip > build_outputs/prom2parquet_image.tar.gz
 
-      - name: Upload Files
+      - name: Upload Clean Outputs
         uses: actions/upload-artifact@v4
         with:
           name: prom2parquet-outputs
-          path: |
-            prom2parquet
-            prom2parquet_image.tar.gz
+          path: build_outputs/
+          retention-days: 1
