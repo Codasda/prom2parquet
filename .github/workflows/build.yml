@@ -11,33 +11,44 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      # 1. 下载代码，并递归拉取子模块文件
+      - name: Checkout Code with Submodules
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
 
+      # 2. 安装官方 Go 环境
       - name: Install Official Go Environment
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
           cache: false
 
-      - name: Execute Author's Official Build Pipeline
+      # 3. 严格执行作者 README 里交代的全部命令
+      - name: Execute Strict Author README Commands
         run: |
-          # 1. 建立最终用于下载的干净目录
           mkdir -p build_outputs
           
-          # 2. 百分之百运行作者写的 Makefile，在本地生成标准的 .build/ 编译缓存
+          # 【步骤 1】初始化并更新子模块
+          git submodule init
+          git submodule update
+          
+          # 【步骤 2】建立并初始化开发环境（这是之前报错的根本原因）
+          make setup
+          
+          # 【步骤 3】正式开始编译 prom2parquet 二进制
           make build
           
-          # 3. 此时隐藏目录 .build 已经就绪，完美契合作者的 images/Dockerfile 路径
+          # 【步骤 4】构建原厂 Docker 镜像
           docker build -f images/Dockerfile -t prom2parquet:latest .
           
-          # 4. 把官方镜像导出为压缩包
+          # 【步骤 5】打包并收集你需要的所有产物
           docker save prom2parquet:latest | gzip > build_outputs/prom2parquet_image.tar.gz
-          
-          # 5. 同时把 Makefile 刚才在 .build/ 目录下原生编译出来的 Linux 二进制也提取出来放好
           cp .build/prom2parquet build_outputs/prom2parquet
 
-      - name: Upload Author Approved Outputs
+      # 4. 上传产物供你下载
+      - name: Upload Finished Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: prom2parquet-outputs
